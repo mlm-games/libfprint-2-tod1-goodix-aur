@@ -55,7 +55,7 @@ def update_pkgbuild(new_version):
     content = re.sub(r'pkgrel=\d+', 'pkgrel=1', content)
     
     # Calculate new checksum
-    deb_url = f"https://launchpad.net/~oem-solutions-group/+archive/ubuntu/intel-iot-lts-focal/+files/{PACKAGE_NAME}_{new_version}_amd64.deb"
+    deb_url = f"https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/{PACKAGE_NAME}_{new_version}_amd64.deb"
     
     try:
         # Download and calculate sha256sum
