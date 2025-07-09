@@ -29,20 +29,20 @@ jobs:
         echo "new_version=0.0.11+2404-0ubuntu1" >> $GITHUB_OUTPUT
         echo "pkgver=0.0.11" >> $GITHUB_OUTPUT
         
-        python update-check.py > output.txt
-        cat output.txt
+        # python update-check.py > output.txt
+        # cat output.txt
         
-        Extract version info
-        if grep -q "New version available!" output.txt; then
-          echo "update_available=true" >> $GITHUB_OUTPUT
-          NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          # Extract just the version number without ubuntu suffix
-          PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
-          echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
-        else
-          echo "update_available=false" >> $GITHUB_OUTPUT
-        fi
+        # Extract version info
+        # if grep -q "New version available!" output.txt; then
+        #   echo "update_available=true" >> $GITHUB_OUTPUT
+        #   NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
+        #   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        #   # Extract just the version number without ubuntu suffix
+        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
+        #   echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
+        # else
+        #   echo "update_available=false" >> $GITHUB_OUTPUT
+        # fi
     
     - name: Download and calculate checksum
       if: steps.check.outputs.update_available == 'true'
