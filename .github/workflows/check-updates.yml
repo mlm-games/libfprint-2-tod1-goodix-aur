@@ -64,7 +64,7 @@ jobs:
         pkgname=libfprint-2-tod1-goodix-v2
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
-        pkgrel=5
+        pkgrel=6
         pkgdesc="Proprietary driver for Goodix fingerprint readers from Ubuntu launchpad"
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
@@ -79,7 +79,7 @@ jobs:
         prepare() {
             cd "$srcdir"
             # Extract the deb file
-            ar x "libfprint-2-tod1-goodix_${_debver}_amd64.deb"
+            ar x "libfprint-2-tod1-goodix-550a_${_debver}_amd64.deb"
             # Extract data archive
             tar -xf data.tar.*
         }
