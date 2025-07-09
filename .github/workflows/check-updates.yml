@@ -60,7 +60,7 @@ jobs:
         cat > aur-package/PKGBUILD << 'EOF'
         # Maintainer: MLM-stuff gfxoxinzh@mozmail.com
         
-        pkgname=libfprint-2-tod1-goodix
+        pkgname=libfprint-2-tod1-goodix-v2
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
         pkgrel=1
@@ -108,7 +108,7 @@ jobs:
       if: steps.check.outputs.update_available == 'true'
       uses: KSXGitHub/github-actions-deploy-aur@master
       with:
-        pkgname: libfprint-2-tod1-goodix
+        pkgname: libfprint-2-tod1-goodix-v2
         pkgbuild: aur-package/PKGBUILD
         commit_username: MLM-stuff
         commit_email: gfxoxinzh@mozmail.com
