@@ -79,7 +79,7 @@ jobs:
         prepare() {
             cd "$srcdir"
             # Extract the deb file
-            ar x "${pkgname}_${_debver}_amd64.deb"
+            ar x "libfprint-2-tod1-goodix_${_debver}_amd64.deb"
             # Extract data archive
             tar -xf data.tar.*
         }
@@ -101,7 +101,7 @@ jobs:
             
             # Install license if present
             if [ -f "usr/share/doc/${pkgname}/copyright" ]; then
-                install -Dm644 "usr/share/doc/${pkgname}/copyright" "$pkgdir/usr/share/licenses/${pkgname}/LICENSE"
+                install -Dm644 "usr/share/doc/libfprint-2-tod1-goodix/copyright" "$pkgdir/usr/share/licenses/${pkgname}/LICENSE"
             fi
         }
         EOF
