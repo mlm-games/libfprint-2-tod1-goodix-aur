@@ -34,17 +34,20 @@ jobs:
         #   NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
         #   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         #   # Extract just the version number without ubuntu suffix
-        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1)
+        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
         #   echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
         # else
         #   echo "update_available=false" >> $GITHUB_OUTPUT
         # fi
+
+        echo "new_version=0.0.11+2404-0ubuntu" >> $GITHUB_OUTPUT
+        echo "pkgver=0.0.11" >> $GITHUB_OUTPUT
     
     - name: Download and calculate checksum
       if: steps.check.outputs.update_available == 'true'
       id: download
       run: |
-        DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix_${{ steps.check.outputs.new_version }}_amd64.deb"
+        DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix-550a_${{ steps.check.outputs.new_version }}_amd64.deb"
         wget -O temp.deb "$DEB_URL"
         CHECKSUM=$(sha256sum temp.deb | cut -d ' ' -f 1)
         echo "sha256sum=$CHECKSUM" >> $GITHUB_OUTPUT
