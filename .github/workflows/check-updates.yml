@@ -24,21 +24,25 @@ jobs:
     - name: Check for updates
       id: check
       run: |
-        # echo "Skipped now, go to next one"
-        python update-check.py > output.txt
-        cat output.txt
+        echo "Skipped now, go to next one"
+        echo "update_available=true" >> $GITHUB_OUTPUT
+        echo "new_version=0.0.11+2404-0ubuntu1" >> $GITHUB_OUTPUT
+        echo "pkgver=0.0.11" >> $GITHUB_OUTPUT
         
-        Extract version info
-        if grep -q "New version available!" output.txt; then
-          echo "update_available=true" >> $GITHUB_OUTPUT
-          NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          # Extract just the version number without ubuntu suffix
-          PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
-          echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
-        else
-          echo "update_available=false" >> $GITHUB_OUTPUT
-        fi
+        # python update-check.py > output.txt
+        # cat output.txt
+        
+        # Extract version info
+        # if grep -q "New version available!" output.txt; then
+        #   echo "update_available=true" >> $GITHUB_OUTPUT
+        #   NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
+        #   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        #   # Extract just the version number without ubuntu suffix
+        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
+        #   echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
+        # else
+        #   echo "update_available=false" >> $GITHUB_OUTPUT
+        # fi
     
     - name: Download and calculate checksum
       if: steps.check.outputs.update_available == 'true'
@@ -60,7 +64,7 @@ jobs:
         pkgname=libfprint-2-tod1-goodix-v2
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
-        pkgrel=1
+        pkgrel=2
         pkgdesc="Proprietary driver for Goodix fingerprint readers from Ubuntu launchpad"
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
