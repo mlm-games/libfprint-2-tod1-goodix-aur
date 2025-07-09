@@ -24,8 +24,9 @@ jobs:
     - name: Check for updates
       id: check
       run: |
-        python update-check.py > output.txt
-        cat output.txt
+        echo "Skipped now, go to next one"
+        # python update-check.py > output.txt
+        # cat output.txt
         
         # Extract version info
         if grep -q "New version available!" output.txt; then
