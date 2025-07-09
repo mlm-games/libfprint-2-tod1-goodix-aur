@@ -15,7 +15,7 @@ AUR package for the Goodix fingerprint reader proprietary driver from Ubuntu Lau
 yay -S libfprint-2-tod1-goodix
 
 # Manual installation
-git clone https://github.com/yourusername/libfprint-2-tod1-goodix-aur.git
+git clone https://github.com/mlm-games/libfprint-2-tod1-goodix-aur.git
 cd libfprint-2-tod1-goodix-aur
 makepkg -si
 ```
