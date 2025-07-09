@@ -27,7 +27,7 @@ jobs:
         echo "Skipped now, go to next one"
         echo "update_available=true" >> $GITHUB_OUTPUT
         echo "new_version=0.0.11+2404-0ubuntu1" >> $GITHUB_OUTPUT
-        echo "pkgver=0.0.11" >> $GITHUB_OUTPUT
+        echo "pkgver=0.0.11+2404" >> $GITHUB_OUTPUT
         
         # python update-check.py > output.txt
         # cat output.txt
@@ -38,7 +38,7 @@ jobs:
         #   NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
         #   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         #   # Extract just the version number without ubuntu suffix
-        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1 | cut -d+ -f1)
+        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1)
         #   echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
         # else
         #   echo "update_available=false" >> $GITHUB_OUTPUT
