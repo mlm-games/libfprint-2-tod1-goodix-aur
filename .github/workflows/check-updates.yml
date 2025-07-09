@@ -65,6 +65,7 @@ jobs:
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
         license=('custom')
+        conflicts=('libfprint-2-tod1-goodix')
         depends=('libfprint-tod')
         makedepends=('tar')
         groups=('fprint')
