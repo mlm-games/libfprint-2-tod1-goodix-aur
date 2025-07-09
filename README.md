@@ -4,7 +4,7 @@ AUR package for the Goodix fingerprint reader proprietary driver from Ubuntu Lau
 
 ## Features
 
-- Automatically checks for updates monthly via GitHub Actions
+- Automatically checks for updates yearly via GitHub Actions
 - Downloads directly from Ubuntu Launchpad
 - Supports multiple Goodix fingerprint reader models
 
