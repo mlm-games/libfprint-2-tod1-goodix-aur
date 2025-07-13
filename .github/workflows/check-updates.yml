@@ -53,6 +53,25 @@ jobs:
         CHECKSUM=$(sha256sum temp.deb | cut -d ' ' -f 1)
         echo "sha256sum=$CHECKSUM" >> $GITHUB_OUTPUT
         rm temp.deb
+
+    - name: Get current pkgrel from AUR
+      id: current_pkgrel
+      run: |
+        # Try to get current PKGBUILD from AUR
+        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
+        echo "current_pkgrel=$CURRENT_PKGREL" >> $GITHUB_OUTPUT
+      continue-on-error: true
+      
+    - name: Determine pkgrel
+      id: pkgrel
+      run: |
+        if [[ "${{ inputs.increment_pkgrel }}" == "true" ]]; then
+          CURRENT=${{ steps.current_pkgrel.outputs.current_pkgrel }}
+          NEW_PKGREL=$((CURRENT + 1))
+          echo "pkgrel=$NEW_PKGREL" >> $GITHUB_OUTPUT
+        else
+          echo "pkgrel=1" >> $GITHUB_OUTPUT
+        fi
     
     - name: Create PKGBUILD
       if: steps.check.outputs.update_available == 'true'
@@ -65,7 +84,7 @@ jobs:
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
         _debname="libfprint-2-tod1-goodix-550a"
-        pkgrel=7
+        pkgrel=${{ steps.pkgrel.outputs.pkgrel }}
         pkgdesc="Proprietary driver for Goodix fingerprint readers from Ubuntu launchpad"
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
@@ -88,9 +107,9 @@ jobs:
         package() {
             cd "$srcdir"
             
-            # Adjust udev rules for Arch (replace plugdev with uaccess, unnecessary ATTRS{dev}?)
+            # Adjust udev rules for Arch (replace plugdev with uaccess, rm unnecessary ATTRS{dev} (tested, works after rm))
             if [ -f "lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules" ]; then
-                # sed -i 's/, ATTRS{dev}=="\*"//' lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules
+                sed -i 's/, ATTRS{dev}=="\*"//' lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules
                 sed -i 's/GROUP="plugdev"/TAG+="uaccess"/' lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules
             fi
             
