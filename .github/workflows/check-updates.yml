@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 0 1 1 *'
   workflow_dispatch: 
+    inputs:
+      increment_pkgrel:
+        description: 'Increment pkgrel (for same version updates)'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   check-and-update:
