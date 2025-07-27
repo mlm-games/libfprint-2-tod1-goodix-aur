@@ -1,14 +1,20 @@
-name: Check and Publish Updates
+name: Check and Update libfprint-2-tod1-goodix
 
 on:
   schedule:
-    - cron: '0 0 1 1 *'
-  workflow_dispatch: 
+    # Run every 20 days at 00:00 UTC
+    - cron: '0 0 */20 * *'
+  workflow_dispatch:
     inputs:
+      force_update:
+        description: 'Force update even if version unchanged'
+        required: false
+        default: false
+        type: boolean
       increment_pkgrel:
         description: 'Increment pkgrel (for same version updates)'
         required: false
-        default: true
+        default: false
         type: boolean
 
 jobs:
@@ -18,60 +24,116 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    
     - name: Install dependencies
       run: |
-        pip install requests beautifulsoup4
+        sudo apt-get update
+        sudo apt-get install -y python3-pip
+        pip3 install requests beautifulsoup4
     
-    - name: Check for updates
+    - name: Check for updates from Launchpad
       id: check
       run: |
-        echo "Skipped now, go to next one"
-        echo "update_available=true" >> $GITHUB_OUTPUT
-        echo "new_version=0.0.11+2404-0ubuntu1" >> $GITHUB_OUTPUT
-        echo "pkgver=0.0.11+2404" >> $GITHUB_OUTPUT
+        # Create inline Python script to check versions
+        cat > check_version.py << 'EOF'
+        import requests
+        from bs4 import BeautifulSoup
+        import re
+        import json
         
-        # python update-check.py > output.txt
-        # cat output.txt
+        LAUNCHPAD_URL = "https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+packages"
+        PACKAGE_NAME = "libfprint-2-tod1-goodix"
         
-        # Extract version info
-        # if grep -q "New version available!" output.txt; then
-        #   echo "update_available=true" >> $GITHUB_OUTPUT
-        #   NEW_VERSION=$(grep "Latest version:" output.txt | cut -d: -f2 | xargs)
-        #   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        #   # Extract just the version number without ubuntu suffix
-        #   PKGVER=$(echo $NEW_VERSION | cut -d- -f1)
-        #   echo "pkgver=$PKGVER" >> $GITHUB_OUTPUT
-        # else
-        #   echo "update_available=false" >> $GITHUB_OUTPUT
-        # fi
+        def get_latest_version():
+            response = requests.get(LAUNCHPAD_URL)
+            if response.status_code != 200:
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            for row in soup.find_all('tr'):
+                if PACKAGE_NAME in str(row):
+                    version_match = re.search(rf'{PACKAGE_NAME}\s+(\d+\.\d+\.\d+\+\d+-\d+ubuntu\d+)', str(row))
+                    if version_match:
+                        return version_match.group(1)
+            return None
+        
+        latest = get_latest_version()
+        if latest:
+            # Extract just the version number without ubuntu suffix for pkgver
+            pkgver = latest.split('-')[0]
+            print(json.dumps({
+                "full_version": latest,
+                "pkgver": pkgver
+            }))
+        EOF
+        
+        # Run the script and capture output
+        VERSION_INFO=$(python3 check_version.py)
+        
+        if [ -z "$VERSION_INFO" ]; then
+          echo "Failed to fetch version info"
+          exit 1
+        fi
+        
+        LATEST_FULL=$(echo "$VERSION_INFO" | jq -r '.full_version')
+        LATEST_PKGVER=$(echo "$VERSION_INFO" | jq -r '.pkgver')
+        
+        echo "Latest version: $LATEST_FULL"
+        echo "latest_version=$LATEST_FULL" >> $GITHUB_OUTPUT
+        echo "pkgver=$LATEST_PKGVER" >> $GITHUB_OUTPUT
+        
+        # Get current version from local PKGBUILD or AUR
+        CURRENT_PKGVER=""
+        if [ -f PKGBUILD ]; then
+          CURRENT_PKGVER=$(grep "^pkgver=" PKGBUILD | cut -d= -f2)
+        fi
+        
+        if [ -z "$CURRENT_PKGVER" ]; then
+          # Try AUR
+          CURRENT_PKGVER=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgver=" | cut -d= -f2 || echo "")
+        fi
+        
+        echo "Current pkgver: $CURRENT_PKGVER"
+        echo "current_pkgver=$CURRENT_PKGVER" >> $GITHUB_OUTPUT
+        
+        if [[ "$LATEST_PKGVER" != "$CURRENT_PKGVER" ]] || [[ "${{ inputs.force_update }}" == "true" ]]; then
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+        else
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+        fi
     
     - name: Download and calculate checksum
-      if: steps.check.outputs.update_available == 'true'
+      if: steps.check.outputs.update_needed == 'true'
       id: download
       run: |
-        DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix-550a_${{ steps.check.outputs.new_version }}_amd64.deb"
+        DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix-550a_${{ steps.check.outputs.latest_version }}_amd64.deb"
         wget -O temp.deb "$DEB_URL"
         CHECKSUM=$(sha256sum temp.deb | cut -d ' ' -f 1)
         echo "sha256sum=$CHECKSUM" >> $GITHUB_OUTPUT
         rm temp.deb
-
+    
     - name: Get current pkgrel from AUR
+      if: steps.check.outputs.update_needed == 'true'
       id: current_pkgrel
       run: |
         # Try to get current PKGBUILD from AUR
-        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
+        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
         echo "current_pkgrel=$CURRENT_PKGREL" >> $GITHUB_OUTPUT
+        
+        # Check if the version in AUR matches what we're updating to
+        AUR_VERSION=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgver=" | cut -d= -f2 || echo "none")
+        if [[ "$AUR_VERSION" == "${{ steps.check.outputs.pkgver }}" ]]; then
+          echo "same_version=true" >> $GITHUB_OUTPUT
+        else
+          echo "same_version=false" >> $GITHUB_OUTPUT
+        fi
       continue-on-error: true
-      
+    
     - name: Determine pkgrel
+      if: steps.check.outputs.update_needed == 'true'
       id: pkgrel
       run: |
-        if [[ "${{ inputs.increment_pkgrel }}" == "true" ]]; then
+        if [[ "${{ steps.current_pkgrel.outputs.same_version }}" == "true" ]] && [[ "${{ inputs.increment_pkgrel }}" == "true" ]]; then
           CURRENT=${{ steps.current_pkgrel.outputs.current_pkgrel }}
           NEW_PKGREL=$((CURRENT + 1))
           echo "pkgrel=$NEW_PKGREL" >> $GITHUB_OUTPUT
@@ -80,13 +142,13 @@ jobs:
         fi
     
     - name: Create PKGBUILD
-      if: steps.check.outputs.update_available == 'true'
+      if: steps.check.outputs.update_needed == 'true'
       run: |
         mkdir -p aur-package
         cat > aur-package/PKGBUILD << 'EOF'
         # Maintainer: MLM-stuff gfxoxinzh@mozmail.com
         
-        pkgname=libfprint-2-tod1-goodix-v2
+        pkgname=libfprint-2-tod1-goodix
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
         _debname="libfprint-2-tod1-goodix-550a"
@@ -95,7 +157,6 @@ jobs:
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
         license=('custom')
-        conflicts=('libfprint-2-tod1-goodix')
         depends=('libfprint-tod')
         makedepends=('tar')
         groups=('fprint')
@@ -113,7 +174,7 @@ jobs:
         package() {
             cd "$srcdir"
             
-            # Adjust udev rules for Arch (replace plugdev with uaccess, rm unnecessary ATTRS{dev} (tested, works after rm))
+            # Adjust udev rules for Arch (replace plugdev with uaccess, rm unnecessary ATTRS{dev})
             if [ -f "lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules" ]; then
                 sed -i 's/, ATTRS{dev}=="\*"//' lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules
                 sed -i 's/GROUP="plugdev"/TAG+="uaccess"/' lib/udev/rules.d/60-libfprint-2-tod1-goodix.rules
@@ -139,12 +200,26 @@ jobs:
         EOF
     
     - name: Publish to AUR
-      if: steps.check.outputs.update_available == 'true'
+      if: steps.check.outputs.update_needed == 'true'
       uses: KSXGitHub/github-actions-deploy-aur@master
       with:
-        pkgname: libfprint-2-tod1-goodix-v2
+        pkgname: libfprint-2-tod1-goodix
         pkgbuild: aur-package/PKGBUILD
         commit_username: MLM-stuff
         commit_email: gfxoxinzh@mozmail.com
         ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        commit_message: "Update to version ${{ steps.check.outputs.pkgver }}"
+        commit_message: "Update to version ${{ steps.check.outputs.pkgver }}-${{ steps.pkgrel.outputs.pkgrel }}"
+    
+    - name: Update repository files
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        # Copy the updated PKGBUILD back to the repo
+        cp aur-package/PKGBUILD .
+        
+        # Update README if needed
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+        git add PKGBUILD
+        git commit -m "Update to version ${{ steps.check.outputs.pkgver }}" || echo "No changes to commit"
+        git push || echo "No changes to push"
