@@ -3,7 +3,7 @@ name: Check and Update libfprint-2-tod1-goodix
 on:
   schedule:
     # Run every 20 days at 00:00 UTC
-    - cron: '0 0 */20 * *'
+    - cron: '0 0 * */3 *'
   workflow_dispatch:
     inputs:
       force_update:
