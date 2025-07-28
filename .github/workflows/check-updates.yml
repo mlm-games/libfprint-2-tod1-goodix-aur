@@ -188,7 +188,7 @@ jobs:
         cat > aur-package/PKGBUILD << 'EOF'
         # Maintainer: MLM-stuff gfxoxinzh@mozmail.com
         
-        pkgname=libfprint-2-tod1-goodix
+        pkgname=libfprint-2-tod1-goodix-v2
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
         _debname="libfprint-2-tod1-goodix-550a"
@@ -197,6 +197,7 @@ jobs:
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
         license=('custom')
+        conflicts=('libfprint-2-tod1-goodix')
         depends=('libfprint-tod')
         makedepends=('tar')
         groups=('fprint')
