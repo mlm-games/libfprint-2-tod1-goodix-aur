@@ -2,7 +2,7 @@ name: Check and Update libfprint-2-tod1-goodix
 
 on:
   schedule:
-    # Run every 20 days at 00:00 UTC
+    # Run every 3 months at 00:00 UTC
     - cron: '0 0 * */3 *'
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip
+        sudo apt-get install -y python3-pip jq
         pip3 install requests beautifulsoup4
     
     - name: Check for updates from Launchpad
@@ -39,40 +39,79 @@ jobs:
         from bs4 import BeautifulSoup
         import re
         import json
+        import sys
         
         LAUNCHPAD_URL = "https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+packages"
         PACKAGE_NAME = "libfprint-2-tod1-goodix"
         
         def get_latest_version():
-            response = requests.get(LAUNCHPAD_URL)
-            if response.status_code != 200:
+            try:
+                response = requests.get(LAUNCHPAD_URL, timeout=30)
+                if response.status_code != 200:
+                    print(f"Error: HTTP {response.status_code}", file=sys.stderr)
+                    return None
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Debug: print first few characters of response
+                print(f"Response received, length: {len(response.text)}", file=sys.stderr)
+                
+                for row in soup.find_all('tr'):
+                    if PACKAGE_NAME in str(row):
+                        # Try multiple regex patterns
+                        patterns = [
+                            rf'{PACKAGE_NAME}\s+(\d+\.\d+\.\d+\+\d+-\d+ubuntu\d+)',
+                            rf'{PACKAGE_NAME}.*?(\d+\.\d+\.\d+\+\d+-\d+ubuntu\d+)',
+                            rf'(\d+\.\d+\.\d+\+\d+-\d+ubuntu\d+)'
+                        ]
+                        
+                        for pattern in patterns:
+                            version_match = re.search(pattern, str(row))
+                            if version_match:
+                                return version_match.group(1)
+                
+                print(f"Package {PACKAGE_NAME} not found in page", file=sys.stderr)
                 return None
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            for row in soup.find_all('tr'):
-                if PACKAGE_NAME in str(row):
-                    version_match = re.search(rf'{PACKAGE_NAME}\s+(\d+\.\d+\.\d+\+\d+-\d+ubuntu\d+)', str(row))
-                    if version_match:
-                        return version_match.group(1)
-            return None
+                
+            except Exception as e:
+                print(f"Exception: {str(e)}", file=sys.stderr)
+                return None
         
         latest = get_latest_version()
         if latest:
             # Extract just the version number without ubuntu suffix for pkgver
             pkgver = latest.split('-')[0]
-            print(json.dumps({
+            result = {
                 "full_version": latest,
                 "pkgver": pkgver
-            }))
+            }
+            print(json.dumps(result))
+            sys.exit(0)
+        else:
+            print("Failed to get version", file=sys.stderr)
+            sys.exit(1)
         EOF
         
         # Run the script and capture output
-        VERSION_INFO=$(python3 check_version.py)
-        
-        if [ -z "$VERSION_INFO" ]; then
-          echo "Failed to fetch version info"
-          exit 1
+        if python3 check_version.py > version_output.json 2> error.log; then
+          VERSION_INFO=$(cat version_output.json)
+          echo "Version info retrieved successfully"
+        else
+          echo "Python script failed. Error log:"
+          cat error.log
+          
+          # Fallback: try with curl and grep
+          echo "Trying fallback method..."
+          LATEST_FULL=$(curl -s "$LAUNCHPAD_URL" | grep -oP 'libfprint-2-tod1-goodix-550a_\K[0-9.+\-]+ubuntu[0-9]+' | head -1)
+          
+          if [ -n "$LATEST_FULL" ]; then
+            LATEST_PKGVER=$(echo "$LATEST_FULL" | cut -d'-' -f1)
+            VERSION_INFO=$(echo "{\"full_version\": \"$LATEST_FULL\", \"pkgver\": \"$LATEST_PKGVER\"}")
+            echo "Fallback method succeeded: $VERSION_INFO"
+          else
+            echo "Both methods failed to fetch version info"
+            exit 1
+          fi
         fi
         
         LATEST_FULL=$(echo "$VERSION_INFO" | jq -r '.full_version')
@@ -107,6 +146,7 @@ jobs:
       id: download
       run: |
         DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix-550a_${{ steps.check.outputs.latest_version }}_amd64.deb"
+        echo "Downloading from: $DEB_URL"
         wget -O temp.deb "$DEB_URL"
         CHECKSUM=$(sha256sum temp.deb | cut -d ' ' -f 1)
         echo "sha256sum=$CHECKSUM" >> $GITHUB_OUTPUT
