@@ -129,7 +129,7 @@ jobs:
         
         if [ -z "$CURRENT_PKGVER" ]; then
           # Try AUR
-          CURRENT_PKGVER=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgver=" | cut -d= -f2 || echo "")
+          CURRENT_PKGVER=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgver=" | cut -d= -f2 || echo "")
         fi
         
         echo "Current pkgver: $CURRENT_PKGVER"
@@ -157,11 +157,11 @@ jobs:
       id: current_pkgrel
       run: |
         # Try to get current PKGBUILD from AUR
-        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
+        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
         echo "current_pkgrel=$CURRENT_PKGREL" >> $GITHUB_OUTPUT
         
         # Check if the version in AUR matches what we're updating to
-        AUR_VERSION=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix" | grep "^pkgver=" | cut -d= -f2 || echo "none")
+        AUR_VERSION=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgver=" | cut -d= -f2 || echo "none")
         if [[ "$AUR_VERSION" == "${{ steps.check.outputs.pkgver }}" ]]; then
           echo "same_version=true" >> $GITHUB_OUTPUT
         else
@@ -243,7 +243,7 @@ jobs:
       if: steps.check.outputs.update_needed == 'true'
       uses: KSXGitHub/github-actions-deploy-aur@master
       with:
-        pkgname: libfprint-2-tod1-goodix
+        pkgname: libfprint-2-tod1-goodix-v2
         pkgbuild: aur-package/PKGBUILD
         commit_username: MLM-stuff
         commit_email: gfxoxinzh@mozmail.com
