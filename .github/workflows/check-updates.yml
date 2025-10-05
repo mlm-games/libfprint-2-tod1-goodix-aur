@@ -242,7 +242,7 @@ jobs:
     
     - name: Publish to AUR
       if: steps.check.outputs.update_needed == 'true'
-      uses: KSXGitHub/github-actions-deploy-aur@master
+      uses: mlm-games/aur-deploy-action@master
       with:
         pkgname: libfprint-2-tod1-goodix-v2
         pkgbuild: aur-package/PKGBUILD
