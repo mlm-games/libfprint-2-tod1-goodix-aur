@@ -2,8 +2,7 @@ name: Check and Update libfprint-2-tod1-goodix
 
 on:
   schedule:
-    # Run every 3 months at 00:00 UTC
-    - cron: '0 0 * */3 *'
+    - cron: '0 0 * */2 *'
   workflow_dispatch:
     inputs:
       force_update:
@@ -20,6 +19,8 @@ on:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
         import json
         import sys
         
-        LAUNCHPAD_URL = "https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+packages"
+        LAUNCHPAD_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+packages"
         PACKAGE_NAME = "libfprint-2-tod1-goodix"
         
         def get_latest_version():
@@ -129,7 +130,8 @@ jobs:
         
         if [ -z "$CURRENT_PKGVER" ]; then
           # Try AUR
-          CURRENT_PKGVER=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgver=" | cut -d= -f2 || echo "")
+          CURRENT_PKGVER=$(curl -fsSL "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" \
+            | awk -F= '/^[[:space:]]*pkgver[[:space:]]*=/ {print $2; exit}')
         fi
         
         echo "Current pkgver: $CURRENT_PKGVER"
@@ -206,9 +208,7 @@ jobs:
         
         prepare() {
             cd "$srcdir"
-            # Extract the deb file
             ar x "${_debname}_${_debver}_amd64.deb"
-            # Extract data archive
             tar -xf data.tar.*
         }
         
@@ -251,16 +251,12 @@ jobs:
         ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
         commit_message: "Update to version ${{ steps.check.outputs.pkgver }}-${{ steps.pkgrel.outputs.pkgrel }}"
     
-    - name: Update repository files
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        # Copy the updated PKGBUILD back to the repo
-        cp aur-package/PKGBUILD .
-        
-        # Update README if needed
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        
-        git add PKGBUILD
-        git commit -m "Update to version ${{ steps.check.outputs.pkgver }}" || echo "No changes to commit"
-        git push || echo "No changes to push"
+    # - name: Update repository files (redundant)
+    #   if: steps.check.outputs.update_needed == 'true'
+    #   run: |
+    #     # Update README (not anymore)
+    #     git config --local user.email "github-actions[bot]@users.noreply.github.com"
+    #     git config --local user.name "github-actions[bot]"
+
+    #     git commit -m "Update to version ${{ steps.check.outputs.pkgver }}" || echo "No changes to commit"
+    #     git push || echo "No changes to push"
