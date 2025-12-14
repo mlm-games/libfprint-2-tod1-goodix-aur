@@ -10,11 +10,6 @@ on:
         required: false
         default: false
         type: boolean
-      increment_pkgrel:
-        description: 'Increment pkgrel (for same version updates)'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   check-and-update:
@@ -34,6 +29,8 @@ jobs:
     - name: Check for updates from Launchpad
       id: check
       run: |
+        set -euo pipefail
+
         # Create inline Python script to check versions
         cat > check_version.py << 'EOF'
         import requests
@@ -119,73 +116,52 @@ jobs:
         LATEST_PKGVER=$(echo "$VERSION_INFO" | jq -r '.pkgver')
         
         echo "Latest version: $LATEST_FULL"
-        echo "latest_version=$LATEST_FULL" >> $GITHUB_OUTPUT
-        echo "pkgver=$LATEST_PKGVER" >> $GITHUB_OUTPUT
+        echo "latest_version=$LATEST_FULL" >> "$GITHUB_OUTPUT"
+        echo "pkgver=$LATEST_PKGVER" >> "$GITHUB_OUTPUT"
         
         # Get current version from local PKGBUILD or AUR
         CURRENT_PKGVER=""
         if [ -f PKGBUILD ]; then
-          CURRENT_PKGVER=$(grep "^pkgver=" PKGBUILD | cut -d= -f2)
+          CURRENT_PKGVER=$(grep "^pkgver=" PKGBUILD | cut -d= -f2 | tr -d "'\" ")
         fi
         
         if [ -z "$CURRENT_PKGVER" ]; then
-          # Try AUR
-          CURRENT_PKGVER=$(curl -fsSL "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" \
-            | awk -F= '/^[[:space:]]*pkgver[[:space:]]*=/ {print $2; exit}')
+          TMPDIR=$(mktemp -d)
+          if git clone --depth 1 "https://aur.archlinux.org/libfprint-2-tod1-goodix-v2.git" "$TMPDIR" >/dev/null 2>&1; then
+            if [ -f "$TMPDIR/PKGBUILD" ]; then
+              CURRENT_PKGVER=$(awk -F= '/^[[:space:]]*pkgver[[:space:]]*=/ {gsub(/["'"'"']/, "", $2); gsub(/^[ \t]+/, "", $2); print $2; exit}' "$TMPDIR/PKGBUILD")
+            fi
+          else
+            echo "Warning: failed to clone AUR repo for libfprint-2-tod1-goodix-v2; assuming no current version"
+          fi
+          rm -rf "$TMPDIR"
         fi
         
         echo "Current pkgver: $CURRENT_PKGVER"
-        echo "current_pkgver=$CURRENT_PKGVER" >> $GITHUB_OUTPUT
+        echo "current_pkgver=$CURRENT_PKGVER" >> "$GITHUB_OUTPUT"
         
         if [[ "$LATEST_PKGVER" != "$CURRENT_PKGVER" ]] || [[ "${{ inputs.force_update }}" == "true" ]]; then
-          echo "update_needed=true" >> $GITHUB_OUTPUT
+          echo "update_needed=true" >> "$GITHUB_OUTPUT"
         else
-          echo "update_needed=false" >> $GITHUB_OUTPUT
+          echo "update_needed=false" >> "$GITHUB_OUTPUT"
         fi
     
     - name: Download and calculate checksum
       if: steps.check.outputs.update_needed == 'true'
       id: download
       run: |
+        set -euo pipefail
         DEB_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+files/libfprint-2-tod1-goodix-550a_${{ steps.check.outputs.latest_version }}_amd64.deb"
         echo "Downloading from: $DEB_URL"
         wget -O temp.deb "$DEB_URL"
         CHECKSUM=$(sha256sum temp.deb | cut -d ' ' -f 1)
-        echo "sha256sum=$CHECKSUM" >> $GITHUB_OUTPUT
+        echo "sha256sum=$CHECKSUM" >> "$GITHUB_OUTPUT"
         rm temp.deb
-    
-    - name: Get current pkgrel from AUR
-      if: steps.check.outputs.update_needed == 'true'
-      id: current_pkgrel
-      run: |
-        # Try to get current PKGBUILD from AUR
-        CURRENT_PKGREL=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgrel=" | cut -d= -f2 || echo "0")
-        echo "current_pkgrel=$CURRENT_PKGREL" >> $GITHUB_OUTPUT
-        
-        # Check if the version in AUR matches what we're updating to
-        AUR_VERSION=$(curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libfprint-2-tod1-goodix-v2" | grep "^pkgver=" | cut -d= -f2 || echo "none")
-        if [[ "$AUR_VERSION" == "${{ steps.check.outputs.pkgver }}" ]]; then
-          echo "same_version=true" >> $GITHUB_OUTPUT
-        else
-          echo "same_version=false" >> $GITHUB_OUTPUT
-        fi
-      continue-on-error: true
-    
-    - name: Determine pkgrel
-      if: steps.check.outputs.update_needed == 'true'
-      id: pkgrel
-      run: |
-        if [[ "${{ steps.current_pkgrel.outputs.same_version }}" == "true" ]] && [[ "${{ inputs.increment_pkgrel }}" == "true" ]]; then
-          CURRENT=${{ steps.current_pkgrel.outputs.current_pkgrel }}
-          NEW_PKGREL=$((CURRENT + 1))
-          echo "pkgrel=$NEW_PKGREL" >> $GITHUB_OUTPUT
-        else
-          echo "pkgrel=1" >> $GITHUB_OUTPUT
-        fi
     
     - name: Create PKGBUILD
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        set -euo pipefail
         mkdir -p aur-package
         cat > aur-package/PKGBUILD << 'EOF'
         # Maintainer: MLM-stuff gfxoxinzh@mozmail.com
@@ -194,7 +170,7 @@ jobs:
         pkgver=${{ steps.check.outputs.pkgver }}
         _debver="${pkgver}-0ubuntu1"
         _debname="libfprint-2-tod1-goodix-550a"
-        pkgrel=${{ steps.pkgrel.outputs.pkgrel }}
+        pkgrel=1
         pkgdesc="Proprietary driver for Goodix fingerprint readers from Ubuntu launchpad"
         arch=('x86_64')
         url="https://launchpad.net/~libfprint-tod1-group"
@@ -246,17 +222,8 @@ jobs:
       with:
         pkgname: libfprint-2-tod1-goodix-v2
         pkgbuild: aur-package/PKGBUILD
+        auto_pkgrel: 'true'
         commit_username: MLM-stuff
         commit_email: gfxoxinzh@mozmail.com
         ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        commit_message: "Update to version ${{ steps.check.outputs.pkgver }}-${{ steps.pkgrel.outputs.pkgrel }}"
-    
-    # - name: Update repository files (redundant)
-    #   if: steps.check.outputs.update_needed == 'true'
-    #   run: |
-    #     # Update README (not anymore)
-    #     git config --local user.email "github-actions[bot]@users.noreply.github.com"
-    #     git config --local user.name "github-actions[bot]"
-
-    #     git commit -m "Update to version ${{ steps.check.outputs.pkgver }}" || echo "No changes to commit"
-    #     git push || echo "No changes to push"
+        commit_message: "Update to version ${{ steps.check.outputs.pkgver }}"
