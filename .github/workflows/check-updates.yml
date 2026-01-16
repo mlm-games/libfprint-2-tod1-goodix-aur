@@ -30,6 +30,8 @@ jobs:
       id: check
       run: |
         set -euo pipefail
+        
+        LAUNCHPAD_URL="https://launchpad.net/~libfprint-tod1-group/+archive/ubuntu/ppa/+packages"
 
         # Create inline Python script to check versions
         cat > check_version.py << 'EOF'
@@ -98,20 +100,20 @@ jobs:
           echo "Python script failed. Error log:"
           cat error.log
           
-          # Fallback: try with curl and grep
+          # Fallback: try with curl and grep 
           echo "Trying fallback method..."
           LATEST_FULL=$(curl -s "$LAUNCHPAD_URL" | grep -oP 'libfprint-2-tod1-goodix-550a_\K[0-9.+\-]+ubuntu[0-9]+' | head -1)
           
           if [ -n "$LATEST_FULL" ]; then
             LATEST_PKGVER=$(echo "$LATEST_FULL" | cut -d'-' -f1)
-            VERSION_INFO=$(echo "{\"full_version\": \"$LATEST_FULL\", \"pkgver\": \"$LATEST_PKGVER\"}")
+            VERSION_INFO="{\"full_version\": \"$LATEST_FULL\", \"pkgver\": \"$LATEST_PKGVER\"}"
             echo "Fallback method succeeded: $VERSION_INFO"
           else
             echo "Both methods failed to fetch version info"
             exit 1
           fi
         fi
-        
+                
         LATEST_FULL=$(echo "$VERSION_INFO" | jq -r '.full_version')
         LATEST_PKGVER=$(echo "$VERSION_INFO" | jq -r '.pkgver')
         
